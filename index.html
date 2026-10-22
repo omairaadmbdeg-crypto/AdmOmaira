@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BodegaControl – Contabilidad, Diezmo e Inventario</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background-color: #0b0f19; color: #f3f4f6; font-family: system-ui, -apple-system, sans-serif; }
+        .card { background: #111827; border: 1px solid #1f2937; border-radius: 1rem; }
+        .gold-text { color: #f59e0b; }
+        .gold-bg { background-color: #f59e0b; }
+    </style>
+</head>
+<body class="pb-12">
+
+    <!-- Header -->
+    <header class="p-4 border-b border-gray-800 bg-gray-900/90 backdrop-blur sticky top-0 z-50 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <div class="p-2 gold-bg rounded-lg text-black font-extrabold text-sm">BC</div>
+            <div>
+                <h1 class="font-bold text-base md:text-lg text-white leading-tight">BodegaControl</h1>
+                <p class="text-[10px] md:text-xs text-gray-400">Contabilidad & diezmo multimoneda</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2 bg-gray-800/80 px-2.5 py-1 rounded-lg border border-gray-700">
+            <span class="text-xs text-gray-400 font-medium">Tasa BCV:</span>
+            <span class="text-xs gold-text font-bold">Bs.</span>
+            <input type="number" step="0.01" id="tasa-bcv" class="w-16 bg-gray-900 text-white font-bold text-xs p-1 rounded text-right focus:outline-none focus:ring-1 focus:ring-yellow-500" value="36.50">
+        </div>
+    </header>
+
+    <main class="p-3 md:p-6 max-w-6xl mx-auto space-y-6">
+
+        <!-- Barra de Respaldos -->
+        <div class="bg-blue-950/40 border border-blue-800/50 p-3 rounded-xl flex items-center justify-between text-xs text-blue-300">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="database" class="w-4 h-4 text-blue-400 shrink-0"></i>
+                <span>Datos guardados en el navegador. Exporta tu respaldo periódicamente.</span>
+            </div>
+            <div class="flex space-x-1 shrink-0 ml-2">
+                <button onclick="exportarJSON()" class="px-2 py-1 bg-blue-900/60 hover:bg-blue-800 border border-blue-700 rounded text-white flex items-center gap-1 text-[11px]"><i data-lucide="download" class="w-3 h-3"></i> JSON</button>
+                <button onclick="exportarCSV()" class="px-2 py-1 bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-700 rounded text-white flex items-center gap-1 text-[11px]"><i data-lucide="file-spreadsheet" class="w-3 h-3"></i> CSV</button>
+                <label class="px-2 py-1 bg-yellow-900/60 hover:bg-yellow-800 border border-yellow-700 rounded text-white flex items-center gap-1 text-[11px] cursor-pointer">
+                    <i data-lucide="upload" class="w-3 h-3"></i> Imp
+                    <input type="file" id="input-importar" accept=".json" class="hidden" onchange="importarJSON(event)">
+                </label>
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <section class="card p-4 md:p-5">
+            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <i data-lucide="layout-dashboard" class="w-4 h-4 gold-text"></i> Resumen Contable y Diezmo
+            </h2>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div class="bg-gray-900/80 p-3 rounded-xl border border-gray-800">
+                    <p class="text-[11px] text-gray-400">Total Inversión Activa</p>
+                    <p id="dash-inversion-usd" class="text-base md:text-lg font-bold text-white mt-0.5">$0.00</p>
+                    <p id="dash-inversion-bs" class="text-[10px] text-gray-500">Bs. 0.00</p>
+                </div>
+                <div class="bg-gray-900/80 p-3 rounded-xl border border-gray-800">
+                    <p class="text-[11px] text-gray-400">Ventas Totales</p>
+                    <p id="dash-ventas-usd" class="text-base md:text-lg font-bold text-emerald-400 mt-0.5">$0.00</p>
+                    <p id="dash-ventas-bs" class="text-[10px] text-gray-500">Bs. 0.00</p>
+                </div>
+                <div class="bg-gray-900/80 p-3 rounded-xl border border-gray-800">
+                    <p class="text-[11px] text-gray-400">Ganancia Neta</p>
+                    <p id="dash-ganancia-usd" class="text-base md:text-lg font-bold text-blue-400 mt-0.5">$0.00</p>
+                    <p id="dash-ganancia-bs" class="text-[10px] text-gray-500">Bs. 0.00</p>
+                </div>
+                <div class="bg-yellow-950/30 p-3 rounded-xl border border-yellow-800/50">
+                    <p class="text-[11px] gold-text font-semibold">Diezmo Total (10%)</p>
+                    <p id="dash-diezmo-total-usd" class="text-base md:text-lg font-bold gold-text mt-0.5">$0.00</p>
+                    <p id="dash-diezmo-total-bs" class="text-[10px] text-gray-400">Bs. 0.00</p>
+                </div>
+                <div class="bg-emerald-950/30 p-3 rounded-xl border border-emerald-800/50">
+                    <p class="text-[11px] text-emerald-400 font-semibold">Diezmo Pendiente</p>
+                    <p id="dash-diezmo-pendiente-usd" class="text-base md:text-lg font-bold text-emerald-400 mt-0.5">$0.00</p>
+                    <p id="dash-diezmo-pendiente-bs" class="text-[10px] text-gray-400">Bs. 0.00</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Formularios -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Registrar Producto -->
+            <section class="card p-4">
+                <h3 id="titulo-form-producto" class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <i data-lucide="package-plus" class="w-4 h-4 gold-text"></i> Registrar / Editar Producto
+                </h3>
+                <form id="form-producto" class="space-y-3">
+                    <input type="hidden" id="prod-id" value="">
+                    <div>
+                        <label class="text-[11px] text-gray-400 block mb-1">Nombre del Producto</label>
+                        <input type="text" id="prod-nombre" placeholder="Ej. Harina de Maíz" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white focus:outline-none focus:border-yellow-500" required>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[11px] text-gray-400 block mb-1">Marca</label>
+                            <input type="text" id="prod-marca" placeholder="Ej. PAN" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-gray-400 block mb-1">Tamaño / Presentación</label>
+                            <input type="text" id="prod-tamano" placeholder="Ej. 1 kg / 1.5 L" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="text-[11px] text-gray-400 block mb-1">Costo Inversión ($)</label>
+                            <input type="number" step="0.01" id="prod-costo" placeholder="0.80" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white" required>
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-gray-400 block mb-1">Precio Venta ($)</label>
+                            <input type="number" step="0.01" id="prod-precio" placeholder="1.00" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white" required>
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-gray-400 block mb-1">Stock Inicial</label>
+                            <input type="number" id="prod-stock" placeholder="20" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white" required>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2 pt-1">
+                        <button type="submit" id="btn-guardar-prod" class="flex-1 py-2 gold-bg font-bold text-black text-xs rounded-lg hover:bg-yellow-600 transition">Guardar Producto</button>
+                        <button type="button" id="btn-cancelar-prod" onclick="cancelarEdicionProd()" class="hidden px-3 py-2 bg-gray-800 text-gray-300 text-xs rounded-lg hover:bg-gray-700">Cancelar</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Movimientos y Diezmo -->
+            <section class="card p-4 space-y-4">
+                <div>
+                    <h3 class="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                        <i data-lucide="arrow-left-right" class="w-4 h-4 gold-text"></i> Registrar Venta o Reposición
+                    </h3>
+                    <form id="form-movimiento" class="space-y-2">
+                        <div>
+                            <select id="mov-producto-id" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white" required>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <select id="mov-tipo" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white">
+                                    <option value="venta">Venta (Salida)</option>
+                                    <option value="entrada">Reposición (Entrada)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <input type="number" id="mov-cantidad" placeholder="Cantidad" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white" required>
+                            </div>
+                            <div>
+                                <input type="date" id="mov-fecha" class="w-full p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 font-bold text-white text-xs rounded-lg transition">Registrar Movimiento</button>
+                    </form>
+                </div>
+
+                <div class="pt-3 border-t border-gray-800">
+                    <h3 class="text-sm font-bold text-yellow-400 mb-2 flex items-center gap-2">
+                        <i data-lucide="heart-handshake" class="w-4 h-4"></i> Registrar Entrega de Diezmo
+                    </h3>
+                    <form id="form-diezmo" class="grid grid-cols-3 gap-2">
+                        <input type="number" step="0.01" id="diezmo-monto" placeholder="Monto $" class="p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white" required>
+                        <input type="date" id="diezmo-fecha" class="p-2 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white" required>
+                        <button type="submit" class="py-2 bg-yellow-600 hover:bg-yellow-500 font-bold text-black text-xs rounded-lg transition">Abonar Diezmo</button>
+                    </form>
+                </div>
+            </section>
+        </div>
+
+        <!-- Tabla de Productos -->
+        <section class="card p-4">
+            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <i data-lucide="package" class="w-4 h-4 gold-text"></i> Inventario y Precios de Productos
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-gray-300">
+                    <thead class="bg-gray-900 text-gray-400 uppercase text-[10px]">
+                        <tr>
+                            <th class="p-2.5">Producto</th>
+                            <th class="p-2.5">Marca / Tamaño</th>
+                            <th class="p-2.5">Stock Actual</th>
+                            <th class="p-2.5">Costo ($)</th>
+                            <th class="p-2.5">Venta ($)</th>
+                            <th class="p-2.5">Venta (Bs)</th>
+                            <th class="p-2.5 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-productos" class="divide-y divide-gray-800">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Historial de Diezmos Entregados -->
+        <section class="card p-4">
+            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <i data-lucide="history" class="w-4 h-4 gold-text"></i> Historial de Diezmos Entregados
+            </h2>
+            <div id="lista-diezmos" class="space-y-2 text-xs text-gray-300">
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Script de Funcionamiento -->
+    <script>
+        const STORAGE_KEY = 'bodega_control_data_v1';
+        let appData = {
+            tasaBCV: 36.50,
+            productos: [],
+            movimientos: [],
+            diezmosPagados: []
+        };
+
+        function hoyISO() {
+            const now = new Date();
+            return now.toISOString().split('T')[0];
+        }
+
+        function formatoUSD(val) {
+            return '$' + Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatoVES(valUSD, tasa) {
+            const ves = Number(valUSD || 0) * Number(tasa || 1);
+            return 'Bs. ' + ves.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function cargarDatos() {
+            const guardado = localStorage.getItem(STORAGE_KEY);
+            if (guardado) {
+                try {
+                    appData = JSON.parse(guardado);
+                } catch(e) { console.error(e); }
+            }
+            if (!appData.tasaBCV) appData.tasaBCV = 36.50;
+            document.getElementById('tasa-bcv').value = appData.tasaBCV;
+            document.getElementById('mov-fecha').value = hoyISO();
+            document.getElementById('diezmo-fecha').value = hoyISO();
+            renderizar();
+        }
+
+        function guardarDatos() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+            renderizar();
+        }
+
+        document.getElementById('tasa-bcv').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            appData.tasaBCV = isNaN(val) ? 0 : val;
+            guardarDatos();
+        });
+
+        document.getElementById('form-producto').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const idEdit = document.getElementById('prod-id').value;
+            const nombre = document.getElementById('prod-nombre').value.trim();
+            const marca = document.getElementById('prod-marca').value.trim();
+            const tamano = document.getElementById('prod-tamano').value.trim();
+            const costo = parseFloat(document.getElementById('prod-costo').value);
+            const precio = parseFloat(document.getElementById('prod-precio').value);
+            const stock = parseInt(document.getElementById('prod-stock').value);
+
+            if (idEdit) {
+                const prod = appData.productos.find(p => p.id == idEdit);
+                if (prod) {
+                    prod.nombre = nombre;
+                    prod.marca = marca;
+                    prod.tamano = tamano;
+                    prod.costo = costo;
+                    prod.precio = precio;
+                    prod.stockInicial = stock;
+                }
+                cancelarEdicionProd();
+            } else {
+                appData.productos.push({
+                    id: Date.now(),
+                    nombre,
+                    marca,
+                    tamano,
+                    costo,
+                    precio,
+                    stockInicial: stock
+                });
+            }
+            document.getElementById('form-producto').reset();
+            guardarDatos();
+        });
+
+        function editarProducto(id) {
+            const p = appData.productos.find(item => item.id == id);
+            if (!p) return;
+            document.getElementById('prod-id').value = p.id;
+            document.getElementById('prod-nombre').value = p.nombre;
+            document.getElementById('prod-marca').value = p.marca;
+            document.getElementById('prod-tamano').value = p.tamano;
+            document.getElementById('prod-costo').value = p.costo;
+            document.getElementById('prod-precio').value = p.precio;
+            document.getElementById('prod-stock').value = p.stockInicial;
+
+            document.getElementById('titulo-form-producto').innerHTML = `<i data-lucide="edit" class="w-4 h-4 gold-text"></i> Editar Producto`;
+            document.getElementById('btn-guardar-prod').innerText = 'Actualizar Producto';
+            document.getElementById('btn-cancelar-prod').classList.remove('hidden');
+            lucide.createIcons();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelarEdicionProd() {
+            document.getElementById('prod-id').value = '';
+            document.getElementById('form-producto').reset();
+            document.getElementById('titulo-form-producto').innerHTML = `<i data-lucide="package-plus" class="w-4 h-4 gold-text"></i> Registrar / Editar Producto`;
+            document.getElementById('btn-guardar-prod').innerText = 'Guardar Producto';
+            document.getElementById('btn-cancelar-prod').classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        function eliminarProducto(id) {
+            if (confirm('¿Eliminar este producto y sus movimientos?')) {
+                appData.productos = appData.productos.filter(p => p.id != id);
+                appData.movimientos = appData.movimientos.filter(m => m.productoId != id);
+                guardarDatos();
+            }
+        }
+
+        document.getElementById('form-movimiento').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const productoId = document.getElementById('mov-producto-id').value;
+            const tipo = document.getElementById('mov-tipo').value;
+            const cantidad = parseInt(document.getElementById('mov-cantidad').value);
+            const fecha = document.getElementById('mov-fecha').value;
+
+            if (!productoId || isNaN(cantidad) || cantidad <= 0) return;
+
+            appData.movimientos.push({
+                id: Date.now(),
+                productoId: Number(productoId),
+                tipo,
+                cantidad,
+                fecha
+            });
+
+            document.getElementById('mov-cantidad').value = '';
+            guardarDatos();
+        });
+
+        document.getElementById('form-diezmo').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const monto = parseFloat(document.getElementById('diezmo-monto').value);
+            const fecha = document.getElementById('diezmo-fecha').value;
+
+            if (isNaN(monto) || monto <= 0) return;
+
+            appData.diezmosPagados.push({
+                id: Date.now(),
+                monto,
+                fecha
+            });
+
+            document.getElementById('diezmo-monto').value = '';
+            guardarDatos();
+        });
+
+        function eliminarDiezmo(id) {
+            if (confirm('¿Eliminar este registro de diezmo?')) {
+                appData.diezmosPagados = appData.diezmosPagados.filter(d => d.id != id);
+                guardarDatos();
+            }
+        }
+
+        function renderizar() {
+            const tasa = appData.tasaBCV || 36.50;
+
+            // Calcular stock actual y finanzas
+            let totalInversion = 0;
+            let ventasTotales = 0;
+            let costoVendidosTotal = 0;
+
+            const productosCalculados = appData.productos.map(p => {
+                const movs = appData.movimientos.filter(m => m.productoId == p.id);
+                let stockActual = p.stockInicial;
+                let vendidas = 0;
+
+                movs.forEach(m => {
+                    if (m.tipo === 'entrada') stockActual += m.cantidad;
+                    if (m.tipo === 'venta') {
+                        stockActual -= m.cantidad;
+                        vendidas += m.cantidad;
+                    }
+                });
+
+                totalInversion += (stockActual * p.costo);
+                ventasTotales += (vendidas * p.precio);
+                costoVendidosTotal += (vendidas * p.costo);
+
+                return { ...p, stockActual, vendidas };
+            });
+
+            const gananciaNeta = ventasTotales - costoVendidosTotal;
+            const diezmoTotal = gananciaNeta * 0.10;
+
+            let diezmoPagadoTotal = 0;
+            appData.diezmosPagados.forEach(d => diezmoPagadoTotal += d.monto);
+            const diezmoPendiente = Math.max(0, diezmoTotal - diezmoPagadoTotal);
+
+            // Actualizar Dashboard
+            document.getElementById('dash-inversion-usd').innerText = formatoUSD(totalInversion);
+            document.getElementById('dash-inversion-bs').innerText = formatoVES(totalInversion, tasa);
+
+            document.getElementById('dash-ventas-usd').innerText = formatoUSD(ventasTotales);
+            document.getElementById('dash-ventas-bs').innerText = formatoVES(ventasTotales, tasa);
+
+            document.getElementById('dash-ganancia-usd').innerText = formatoUSD(gananciaNeta);
+            document.getElementById('dash-ganancia-bs').innerText = formatoVES(gananciaNeta, tasa);
+
+            document.getElementById('dash-diezmo-total-usd').innerText = formatoUSD(diezmoTotal);
+            document.getElementById('dash-diezmo-total-bs').innerText = formatoVES(diezmoTotal, tasa);
+
+            document.getElementById('dash-diezmo-pendiente-usd').innerText = formatoUSD(diezmoPendiente);
+            document.getElementById('dash-diezmo-pendiente-bs').innerText = formatoVES(diezmoPendiente, tasa);
+
+            // Select de productos en movimiento
+            const selectProd = document.getElementById('mov-producto-id');
+            selectProd.innerHTML = productosCalculados.map(p => 
+                `<option value="${p.id}">${p.nombre} (${p.marca || 'Sin marca'}) - Stock: ${p.stockActual}</option>`
+            ).join('');
+
+            // Tabla de productos
+            const tbodyProd = document.getElementById('tabla-productos');
+            tbodyProd.innerHTML = '';
+            if (productosCalculados.length === 0) {
+                tbodyProd.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-500">No hay productos registrados.</td></tr>`;
+            } else {
+                productosCalculados.forEach(p => {
+                    tbodyProd.innerHTML += `
+                        <tr class="hover:bg-gray-800/40">
+                            <td class="p-2.5 font-semibold text-white">${p.nombre}</td>
+                            <td class="p-2.5 text-gray-400">${p.marca || '-'} / ${p.tamano || '-'}</td>
+                            <td class="p-2.5 font-bold ${p.stockActual <= 3 ? 'text-rose-400' : 'text-emerald-400'}">${p.stockActual}</td>
+                            <td class="p-2.5">${formatoUSD(p.costo)}</td>
+                            <td class="p-2.5 font-bold gold-text">${formatoUSD(p.precio)}</td>
+                            <td class="p-2.5 text-gray-300">${formatoVES(p.precio, tasa)}</td>
+                            <td class="p-2.5 text-center space-x-1">
+                                <button onclick="editarProducto(${p.id})" class="p-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded" title="Editar"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="eliminarProducto(${p.id})" class="p-1 bg-gray-800 hover:bg-rose-950 text-rose-400 rounded" title="Eliminar"><i data-lucide="trash" class="w-3.5 h-3.5"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            // Historial de diezmos
+            const listaDiezmos = document.getElementById('lista-diezmos');
+            listaDiezmos.innerHTML = '';
+            if (appData.diezmosPagados.length === 0) {
+                listaDiezmos.innerHTML = `<p class="text-gray-500 italic">No hay entregas de diezmo registradas.</p>`;
+            } else {
+                appData.diezmosPagados.forEach(d => {
+                    listaDiezmos.innerHTML += `
+                        <div class="flex justify-between items-center bg-gray-900/60 p-2 rounded border border-gray-800">
+                            <div>
+                                <span class="font-bold gold-text">${formatoUSD(d.monto)}</span> 
+                                <span class="text-gray-400 ml-1">(${formatoVES(d.monto, tasa)})</span>
+                                <span class="text-[10px] text-gray-500 ml-2">${d.fecha}</span>
+                            </div>
+                            <button onclick="eliminarDiezmo(${d.id})" class="text-gray-500 hover:text-rose-400 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    `;
+                });
+            }
+
+            lucide.createIcons();
+        }
+
+        function exportarJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `BodegaControl_Respaldo_${hoyISO()}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function exportarCSV() {
+            let csv = "\uFEFFNombre;Marca;Tamano;Stock Inicial;Costo USD;Precio USD\n";
+            appData.productos.forEach(p => {
+                csv += `"${p.nombre}","${p.marca}","${p.tamano}","${p.stockInicial}","${p.costo}","${p.precio}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Inventario_${hoyISO()}.csv`;
+            a.click();
+        }
+
+        function importarJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported && imported.productos) {
+                        appData = imported;
+                        guardarDatos();
+                        alert('Datos importados con éxito.');
+                    }
+                } catch(err) { alert('Archivo inválido.'); }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        cargarDatos();
+    </script>
+</body>
+</html>
